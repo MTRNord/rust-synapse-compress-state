@@ -554,6 +554,8 @@ pub struct ChunkStats {
     pub new_num_rows: usize,
     // Whether or not the changes were commited to the database
     pub commited: bool,
+    // Wheter an error happened
+    pub error: Option<StateCompressorError>,
 }
 
 /// Loads a compressor state, runs it on a room and then returns info on how it got on
@@ -590,6 +592,7 @@ pub fn continue_run(
             original_num_rows,
             new_num_rows,
             commited: false,
+            error: None,
         });
     }
 
@@ -603,6 +606,7 @@ pub fn continue_run(
                 original_num_rows,
                 new_num_rows,
                 commited: true,
+                error: None,
             })
         }
         Err(e) => {
@@ -613,6 +617,7 @@ pub fn continue_run(
                 original_num_rows,
                 new_num_rows,
                 commited: false,
+                error: Some(StateCompressorError::InvalidState),
             })
         }
     }

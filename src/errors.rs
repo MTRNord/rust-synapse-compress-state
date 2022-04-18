@@ -16,4 +16,6 @@ pub enum StateCompressorError {
     // This recursion is totally safe as we never have more than 2 levels of recursion
     #[error("expected state to match: {0}")]
     ExpectedStateMismatched(Box<StateCompressorError>),
+    #[error("Invalid State found")]
+    InvalidState,
 }
