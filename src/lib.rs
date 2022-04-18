@@ -32,12 +32,15 @@ use string_cache::DefaultAtom as Atom;
 
 mod compressor;
 mod database;
+pub mod errors;
 mod graphing;
 
 pub use compressor::Level;
 
 use compressor::Compressor;
 use database::PGEscape;
+
+use crate::errors::StateCompressorError;
 
 /// An entry for a state group. Consists of an (optional) previous group and the
 /// delta from that previous group (or the full state if no previous group)
@@ -637,15 +640,16 @@ fn check_that_maps_match(
     old_map
         .par_iter() // This uses rayon to run the checks in parallel
         .try_for_each(|(sg, _)| {
-            let expected = collapse_state_maps(old_map, *sg);
-            let actual = collapse_state_maps(new_map, *sg);
+            let expected = collapse_state_maps(old_map, *sg)?;
+            let actual = collapse_state_maps(new_map, *sg)?;
 
             pb.inc(1);
 
             if expected != actual {
-                Err(format!(
-                    "States for group {} do not match. Expected {:#?}, found {:#?}",
-                    sg, expected, actual
+                Err(crate::StateCompressorError::StateMissmatchedForGroup(
+                    *sg,
+                    Box::new(expected),
+                    Box::new(actual),
                 ))
             } else {
                 Ok(())
@@ -659,9 +663,12 @@ fn check_that_maps_match(
 }
 
 /// Gets the full state for a given group from the map (of deltas)
-fn collapse_state_maps(map: &BTreeMap<i64, StateGroupEntry>, state_group: i64) -> StateMap<Atom> {
+fn collapse_state_maps(
+    map: &BTreeMap<i64, StateGroupEntry>,
+    state_group: i64,
+) -> std::result::Result<StateMap<Atom>, StateCompressorError> {
     if !map.contains_key(&state_group) {
-        panic!("Missing {}", state_group);
+        return Err(StateCompressorError::MissingStateGroup(state_group));
     }
 
     let mut entry = &map[&state_group];
@@ -672,7 +679,9 @@ fn collapse_state_maps(map: &BTreeMap<i64, StateGroupEntry>, state_group: i64) -
     while let Some(prev_state_group) = entry.prev_state_group {
         stack.push(prev_state_group);
         if !map.contains_key(&prev_state_group) {
-            panic!("Missing {}", prev_state_group);
+            return Err(StateCompressorError::MissingPrevStateGroup(
+                prev_state_group,
+            ));
         }
         entry = &map[&prev_state_group];
     }
@@ -686,7 +695,7 @@ fn collapse_state_maps(map: &BTreeMap<i64, StateGroupEntry>, state_group: i64) -
         );
     }
 
-    state_map
+    Ok(state_map)
 }
 
 // PyO3 INTERFACE STARTS HERE

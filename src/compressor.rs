@@ -32,6 +32,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use state_map::StateMap;
 use std::collections::BTreeMap;
 use string_cache::DefaultAtom as Atom;
+use tracing::error;
 
 use super::{collapse_state_maps, StateGroupEntry};
 
@@ -225,7 +226,14 @@ impl<'a> Compressor<'a> {
                 (entry.state_map.clone(), prev_state_group)
             } else {
                 self.stats.state_groups_changed += 1;
-                self.get_delta(prev_state_group, state_group)
+                match self.get_delta(prev_state_group, state_group) {
+                    Ok(delta) => delta,
+                    Err(e) => {
+                        // TODO make sure this doesnt break state
+                        error!("Failed to get delta for state group {}: {}", state_group, e);
+                        break;
+                    }
+                }
             };
 
             self.new_state_group_map.insert(
@@ -251,20 +259,24 @@ impl<'a> Compressor<'a> {
     /// group that can be used as a base for a delta.
     ///
     /// Returns the state map and the actual base state group (if any) used.
-    fn get_delta(&mut self, prev_sg: Option<i64>, sg: i64) -> (StateMap<Atom>, Option<i64>) {
-        let state_map = collapse_state_maps(self.original_state_map, sg);
+    fn get_delta(
+        &mut self,
+        prev_sg: Option<i64>,
+        sg: i64,
+    ) -> color_eyre::Result<(StateMap<Atom>, Option<i64>)> {
+        let state_map = collapse_state_maps(self.original_state_map, sg)?;
 
         let mut prev_sg = if let Some(prev_sg) = prev_sg {
             prev_sg
         } else {
-            return (state_map, None);
+            return Ok((state_map, None));
         };
 
         // This is a loop to go through to find the first prev_sg which can be
         // a valid base for the state group.
         let mut prev_state_map;
         'outer: loop {
-            prev_state_map = collapse_state_maps(self.original_state_map, prev_sg);
+            prev_state_map = collapse_state_maps(self.original_state_map, prev_sg)?;
             for (t, s) in prev_state_map.keys() {
                 if !state_map.contains_key(t, s) {
                     // This is not a valid base as it contains key the new state
@@ -280,7 +292,7 @@ impl<'a> Compressor<'a> {
                     self.stats.resets_no_suitable_prev += 1;
                     self.stats.resets_no_suitable_prev_size += state_map.len();
 
-                    return (state_map, None);
+                    return Ok((state_map, None));
                 }
             }
 
@@ -296,7 +308,7 @@ impl<'a> Compressor<'a> {
             }
         }
 
-        (delta_map, Some(prev_sg))
+        Ok((delta_map, Some(prev_sg)))
     }
 }
 

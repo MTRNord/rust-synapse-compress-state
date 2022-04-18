@@ -20,6 +20,7 @@ string_cache = "0.8.0"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 color-eyre = "0.6.1"
+thiserror = "1.0.30"
 
 [dependencies.state-map]
 git = "https://github.com/matrix-org/rust-matrix-state-map"
