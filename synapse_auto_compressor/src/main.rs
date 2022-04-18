@@ -16,8 +16,9 @@
 //! the state_compressor_state table so that the compressor can seemlesly
 //! continue from where it left off.
 
-//#[global_allocator]
-//static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+#[cfg(feature = "jemalloc")]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 mod manager;
 mod state_saving;

@@ -1193,6 +1193,7 @@ dependencies = [
  "rand",
  "serial_test",
  "synapse_compress_state",
+ "tikv-jemallocator",
  "tracing",
  "tracing-subscriber",
 ]

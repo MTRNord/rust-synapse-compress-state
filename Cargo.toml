@@ -37,6 +37,6 @@ version = "0.4.1"
 optional = true
 
 [features]
-default = []
+default = ["jemalloc"]
 jemalloc = ["tikv-jemallocator"]
 no-progress-bars = []
