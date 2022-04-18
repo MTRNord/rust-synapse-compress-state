@@ -389,7 +389,9 @@ pub fn run(mut config: Config) {
     }
 
     if config.verify {
-        check_that_maps_match(&state_group_map, new_state_group_map);
+        if let Err(e) = check_that_maps_match(&state_group_map, new_state_group_map) {
+            panic!("Invalid state found: {}", e);
+        }
     }
 
     // If we are given an output file, we output the changes as SQL. If the
@@ -591,17 +593,29 @@ pub fn continue_run(
         });
     }
 
-    check_that_maps_match(&state_group_map, new_state_group_map);
+    match check_that_maps_match(&state_group_map, new_state_group_map) {
+        Ok(_) => {
+            database::send_changes_to_db(db_url, room_id, &state_group_map, new_state_group_map);
 
-    database::send_changes_to_db(db_url, room_id, &state_group_map, new_state_group_map);
-
-    Some(ChunkStats {
-        new_level_info: compressor.get_level_info(),
-        last_compressed_group: max_group_found,
-        original_num_rows,
-        new_num_rows,
-        commited: true,
-    })
+            Some(ChunkStats {
+                new_level_info: compressor.get_level_info(),
+                last_compressed_group: max_group_found,
+                original_num_rows,
+                new_num_rows,
+                commited: true,
+            })
+        }
+        Err(e) => {
+            warn!("Invalid state found: {}", e);
+            Some(ChunkStats {
+                new_level_info: compressor.get_level_info(),
+                last_compressed_group: max_group_found,
+                original_num_rows,
+                new_num_rows,
+                commited: false,
+            })
+        }
+    }
 }
 
 /// Compares two sets of state groups
@@ -621,7 +635,7 @@ pub fn continue_run(
 fn check_that_maps_match(
     old_map: &BTreeMap<i64, StateGroupEntry>,
     new_map: &BTreeMap<i64, StateGroupEntry>,
-) {
+) -> std::result::Result<(), StateCompressorError> {
     info!("Checking that state maps match...");
 
     let pb: ProgressBar = if cfg!(feature = "no-progress-bars") {
@@ -646,7 +660,7 @@ fn check_that_maps_match(
             pb.inc(1);
 
             if expected != actual {
-                Err(crate::StateCompressorError::StateMissmatchedForGroup(
+                Err(StateCompressorError::StateMissmatchedForGroup(
                     *sg,
                     Box::new(expected),
                     Box::new(actual),
@@ -655,11 +669,12 @@ fn check_that_maps_match(
                 Ok(())
             }
         })
-        .expect("expected state to match");
+        .map_err(|x| StateCompressorError::ExpectedStateMismatched(Box::new(x)))?;
 
     pb.finish();
 
     info!("New state map matches old one");
+    Ok(())
 }
 
 /// Gets the full state for a given group from the map (of deltas)
