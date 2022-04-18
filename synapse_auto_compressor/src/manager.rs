@@ -7,6 +7,7 @@ use crate::state_saving::{
 };
 use color_eyre::eyre::bail;
 use color_eyre::eyre::{Result, WrapErr};
+use synapse_compress_state::errors::StateCompressorError;
 use synapse_compress_state::{continue_run, ChunkStats, Level};
 use tracing::{debug, info, warn};
 
@@ -73,7 +74,7 @@ pub fn run_compressor_on_room_chunk(
     // Check to see whether the compressor sent its changes to the database
     if !chunk_stats.commited {
         if chunk_stats.new_num_rows - chunk_stats.original_num_rows != 0
-            && !matches!(chunk_stats.error, Some(ChunkStats::Error::InvalidState))
+            && !matches!(chunk_stats.error, Some(StateCompressorError::InvalidState))
         {
             warn!(
                 "The compressor tried to increase the number of rows in {} between {:?} and {}. Skipping...",
