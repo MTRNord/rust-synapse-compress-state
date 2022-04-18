@@ -20,8 +20,8 @@
 // of arguments - this hopefully doesn't make the code unclear
 // #[allow(clippy::too_many_arguments)] is therefore used around some functions
 
-use log::{info, warn, LevelFilter};
 use pyo3::{exceptions, prelude::*};
+use tracing::{info, warn};
 
 use clap::{crate_authors, crate_description, crate_name, crate_version, value_t, App, Arg};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -507,12 +507,11 @@ fn output_sql(
 
     info!("Writing changes...");
 
-    let pb: ProgressBar;
-    if cfg!(feature = "no-progress-bars") {
-        pb = ProgressBar::hidden();
+    let pb: ProgressBar = if cfg!(feature = "no-progress-bars") {
+        ProgressBar::hidden()
     } else {
-        pb = ProgressBar::new(old_map.len() as u64);
-    }
+        ProgressBar::new(old_map.len() as u64)
+    };
     pb.set_style(
         ProgressStyle::default_bar().template("[{elapsed_precise}] {bar} {pos}/{len} {msg}"),
     );
@@ -622,12 +621,11 @@ fn check_that_maps_match(
 ) {
     info!("Checking that state maps match...");
 
-    let pb: ProgressBar;
-    if cfg!(feature = "no-progress-bars") {
-        pb = ProgressBar::hidden();
+    let pb: ProgressBar = if cfg!(feature = "no-progress-bars") {
+        ProgressBar::hidden()
     } else {
-        pb = ProgressBar::new(old_map.len() as u64);
-    }
+        ProgressBar::new(old_map.len() as u64)
+    };
     pb.set_style(
         ProgressStyle::default_bar().template("[{elapsed_precise}] {bar} {pos}/{len} {msg}"),
     );
@@ -805,16 +803,6 @@ fn run_compression(
 /// Python module - "import synapse_compress_state" to use
 #[pymodule]
 fn synapse_compress_state(_py: Python, m: &PyModule) -> PyResult<()> {
-    let _ = pyo3_log::Logger::default()
-        // don't send out anything lower than a warning from other crates
-        .filter(LevelFilter::Warn)
-        // don't log warnings from synapse_compress_state, the synapse_auto_compressor handles these
-        // situations and provides better log messages
-        .filter_target("synapse_compress_state".to_owned(), LevelFilter::Debug)
-        .install();
-    // ensure any panics produce error messages in the log
-    log_panics::init();
-
     m.add_function(wrap_pyfunction!(run_compression, m)?)?;
     Ok(())
 }

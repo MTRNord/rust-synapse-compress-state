@@ -13,12 +13,12 @@
 // limitations under the License.
 
 use indicatif::{ProgressBar, ProgressStyle};
-use log::{debug, trace};
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
 use postgres::{fallible_iterator::FallibleIterator, types::ToSql, Client};
 use postgres_openssl::MakeTlsConnector;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use std::{borrow::Cow, collections::BTreeMap, fmt};
+use tracing::{debug, trace};
 
 use crate::{compressor::Level, generate_sql};
 
@@ -372,12 +372,11 @@ fn get_initial_data_from_db(
     // Copy the data from the database into a map
     let mut state_group_map: BTreeMap<i64, StateGroupEntry> = BTreeMap::new();
 
-    let pb: ProgressBar;
-    if cfg!(feature = "no-progress-bars") {
-        pb = ProgressBar::hidden();
+    let pb: ProgressBar = if cfg!(feature = "no-progress-bars") {
+        ProgressBar::hidden()
     } else {
-        pb = ProgressBar::new_spinner();
-    }
+        ProgressBar::new_spinner()
+    };
     pb.set_style(
         ProgressStyle::default_spinner().template("{spinner} [{elapsed}] {pos} rows retrieved"),
     );
@@ -537,12 +536,11 @@ pub fn send_changes_to_db(
     debug!("Writing changes...");
 
     // setup the progress bar
-    let pb: ProgressBar;
-    if cfg!(feature = "no-progress-bars") {
-        pb = ProgressBar::hidden();
+    let pb: ProgressBar = if cfg!(feature = "no-progress-bars") {
+        ProgressBar::hidden()
     } else {
-        pb = ProgressBar::new(old_map.len() as u64);
-    }
+        ProgressBar::new(old_map.len() as u64)
+    };
     pb.set_style(
         ProgressStyle::default_bar().template("[{elapsed_precise}] {bar} {pos}/{len} {msg}"),
     );

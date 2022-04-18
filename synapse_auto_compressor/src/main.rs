@@ -16,38 +16,63 @@
 //! the state_compressor_state table so that the compressor can seemlesly
 //! continue from where it left off.
 
-#[global_allocator]
-static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+//#[global_allocator]
+//static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
+mod manager;
+mod state_saving;
 
 use clap::{crate_authors, crate_description, crate_name, crate_version, value_t, App, Arg};
-use log::LevelFilter;
+use color_eyre::eyre::Result;
 use std::env;
-use synapse_auto_compressor::{manager, state_saving, LevelInfo};
+use std::str::FromStr;
+use synapse_compress_state::Level;
+use tracing::info;
+
+/// Helper struct for parsing the `default_levels` argument.
+///
+/// The compressor keeps track of a number of Levels, each of which have a maximum length,
+/// current length, and an optional current head (None if level is empty, Some if a head
+/// exists).
+///
+/// This is needed since FromStr cannot be implemented for structs
+/// that aren't defined in this scope
+#[derive(PartialEq, Debug)]
+pub struct LevelInfo(pub Vec<Level>);
+
+// Implement FromStr so that an argument of the form "100,50,25"
+// can be used to create a vector of levels with max sizes 100, 50 and 25
+// For more info see the LevelState documentation in lib.rs
+impl FromStr for LevelInfo {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // Stores the max sizes of each level
+        let mut level_info: Vec<Level> = Vec::new();
+
+        // Split the string up at each comma
+        for size_str in s.split(',') {
+            // try and convert each section into a number
+            // panic if that fails
+            let size: usize = size_str
+                .parse()
+                .map_err(|_| "Not a comma separated list of numbers")?;
+            // add this parsed number to the sizes struct
+            level_info.push(Level::new(size));
+        }
+
+        // Return the built up vector inside a LevelInfo struct
+        Ok(LevelInfo(level_info))
+    }
+}
 
 /// Execution starts here
-fn main() {
-    // setup the logger for the synapse_auto_compressor
-    // The default can be overwritten with RUST_LOG
-    // see the README for more information
-    if env::var("RUST_LOG").is_err() {
-        let mut log_builder = env_logger::builder();
-        // Ensure panics still come through
-        log_builder.filter_module("panic", LevelFilter::Error);
-        // Only output errors from the synapse_compress state library
-        log_builder.filter_module("synapse_compress_state", LevelFilter::Error);
-        // Output log levels info and above from synapse_auto_compressor
-        log_builder.filter_module("synapse_auto_compressor", LevelFilter::Info);
-        log_builder.init();
-    } else {
-        // If RUST_LOG was set then use that
-        let mut log_builder = env_logger::Builder::from_env("RUST_LOG");
-        // Ensure panics still come through
-        log_builder.filter_module("panic", LevelFilter::Error);
-        log_builder.init();
-    }
-    log_panics::init();
+fn main() -> Result<()> {
+    tracing_subscriber::fmt::init();
+    color_eyre::install()?;
+
     // Announce the start of the program to the logs
-    log::info!("synapse_auto_compressor started");
+    info!("synapse_auto_compressor started");
 
     // parse the command line arguments using the clap crate
     let arguments = App::new(crate_name!())
@@ -145,8 +170,8 @@ fn main() {
 
     // call compress_largest_rooms with the arguments supplied
     // panic if an error is produced
-    manager::compress_chunks_of_database(db_url, chunk_size, &default_levels.0, number_of_chunks)
-        .unwrap();
+    manager::compress_chunks_of_database(db_url, chunk_size, &default_levels.0, number_of_chunks)?;
 
-    log::info!("synapse_auto_compressor finished");
+    info!("synapse_auto_compressor finished");
+    Ok(())
 }

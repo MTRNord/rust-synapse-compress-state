@@ -5,9 +5,10 @@ use crate::state_saving::{
     connect_to_database, create_tables_if_needed, get_next_room_to_compress,
     read_room_compressor_state, write_room_compressor_state,
 };
-use anyhow::{bail, Context, Result};
-use log::{debug, info, warn};
+use color_eyre::eyre::bail;
+use color_eyre::eyre::{Result, WrapErr};
 use synapse_compress_state::{continue_run, ChunkStats, Level};
+use tracing::{debug, info, warn};
 
 /// Runs the compressor on a chunk of the room
 ///

@@ -1,8 +1,9 @@
 // This module contains functions to communicate with the database
 
-use anyhow::{bail, Result};
-use log::trace;
+use color_eyre::eyre::bail;
+use color_eyre::eyre::Result;
 use synapse_compress_state::Level;
+use tracing::trace;
 
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
 use postgres::{fallible_iterator::FallibleIterator, types::ToSql, Client};
